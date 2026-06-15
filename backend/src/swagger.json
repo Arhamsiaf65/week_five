@@ -1,0 +1,112 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "ArchitectAI API",
+    "version": "1.0.0",
+    "description": "API documentation for ArchitectAI (Auth, Conversations, AI chat)."
+  },
+  "servers": [
+    { "url": "http://localhost:5000/api/v1", "description": "Local dev server" }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Register" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "User registered" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Login user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Login" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "summary": "Refresh access token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Refresh" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "New tokens" } }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Logout (revoke refresh token)",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Refresh" } } }
+        },
+        "responses": { "200": { "description": "Logged out" } }
+      }
+    },
+    "/ai/chat": {
+      "post": {
+        "summary": "Start chat streaming (SSE)",
+        "description": "Initiates a streaming response via Server-Sent Events. Protect this endpoint with Authorization: Bearer <token>.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChatRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "SSE stream" } },
+        "security": [{ "bearerAuth": [] }]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "schemas": {
+      "Register": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "password": { "type": "string" }
+        },
+        "required": ["name", "email", "password"]
+      },
+      "Login": {
+        "type": "object",
+        "properties": { "email": { "type": "string" }, "password": { "type": "string" } },
+        "required": ["email", "password"]
+      },
+      "Refresh": { "type": "object", "properties": { "refreshToken": { "type": "string" } }, "required": ["refreshToken"] },
+      "ChatRequest": {
+        "type": "object",
+        "properties": { "conversationId": { "type": "string" }, "message": { "type": "string" } },
+        "required": ["conversationId", "message"]
+      }
+    }
+  }
+}
