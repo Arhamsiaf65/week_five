@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: architect-ai-backend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: architect-ai-db
+          property: connectionString
+      - key: CLIENT_URL
+        value: https://architect-ai-frontend.onrender.com
+
+  - type: web
+    name: architect-ai-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://architect-ai-backend.onrender.com/api/v1
+
+databases:
+  - name: architect-ai-db
+    databaseName: architect_ai
+    user: architect_admin

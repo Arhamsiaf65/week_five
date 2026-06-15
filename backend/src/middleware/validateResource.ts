@@ -1,0 +1,17 @@
+import { Request, Response, NextFunction } from 'express';
+import { ZodTypeAny } from 'zod';
+
+export const validateResource = (schema: ZodTypeAny) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        try {
+            schema.parse({
+                body: req.body,
+                query: req.query,
+                params: req.params,
+            });
+            next();
+        } catch (error) {
+            next(error);
+        }
+    };
+};
