@@ -6,6 +6,7 @@ import { api } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Send, Bot, User, CheckCircle2, Copy } from 'lucide-react';
 import { MermaidDiagram } from '../components/MermaidDiagram';
+import { useQuery } from '@tanstack/react-query';
 
 interface Message {
     id?: string;
@@ -60,8 +61,20 @@ const markdownComponents: Partial<Components> = {
 
 const Workspace = () => {
     const { id } = useParams<{ id: string }>();
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [tools, setTools] = useState<ToolExecution[]>([]);
+    
+    // Server state via React Query
+    const { data: history = { messages: [], toolExecutions: [] }, isLoading } = useQuery({
+        queryKey: ['conversations', id],
+        queryFn: async () => {
+            const { data } = await api.get(`/conversations/${id}`);
+            return data;
+        }
+    });
+
+    // Local state for new messages and tools appended during the current session
+    const [liveMessages, setLiveMessages] = useState<Message[]>([]);
+    const [liveTools, setLiveTools] = useState<ToolExecution[]>([]);
+    
     const [input, setInput] = useState('');
     const [streamingContent, setStreamingContent] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
@@ -69,18 +82,12 @@ const Workspace = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const accessToken = useAuthStore((state) => state.accessToken);
 
-    useEffect(() => {
-        const fetchDetails = async () => {
-            const { data } = await api.get(`/conversations/${id}`);
-            setMessages(data.messages || []);
-            setTools(data.toolExecutions || []);
-        };
-        fetchDetails();
-    }, [id]);
+    const allMessages = [...(history.messages || []), ...liveMessages];
+    const allTools = [...(history.toolExecutions || []), ...liveTools];
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, streamingContent]);
+    }, [allMessages, streamingContent]);
 
     const handleCopy = async (text: string, id: string) => {
         try {
@@ -98,7 +105,7 @@ const Workspace = () => {
 
         const userMessage = input.trim();
         setInput('');
-        setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+        setLiveMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
         setIsStreaming(true);
         setStreamingContent('');
 
@@ -131,16 +138,9 @@ const Workspace = () => {
                         if (data.type === 'token') {
                             setStreamingContent((prev) => prev + data.content);
                         } else if (data.type === 'tool_end') {
-                            setTools((prev) => [...prev, { tool_name: data.tool }]);
+                            setLiveTools((prev) => [...prev, { tool_name: data.tool }]);
                         } else if (data.type === 'done') {
-                            // Finish streaming
                             setIsStreaming(false);
-                            setMessages((prev) => {
-                                // Have to use functional update to capture the latest streamingContent closure value
-                                // But simpler: we know it's done, we'll append the final streamingContent in a useLayoutEffect 
-                                // Actually we can just do it here if we use a ref or just let the next render append it.
-                                return prev; 
-                            });
                         } else if (data.type === 'error') {
                             console.error(data.message);
                             setIsStreaming(false);
@@ -154,21 +154,20 @@ const Workspace = () => {
         }
     };
 
-    // Effect to commit streamed message to message list when done
     useEffect(() => {
         if (!isStreaming && streamingContent) {
-            setMessages((prev) => [...prev, { role: 'assistant', content: streamingContent }]);
+            setLiveMessages((prev) => [...prev, { role: 'assistant', content: streamingContent }]);
             setStreamingContent('');
         }
     }, [isStreaming, streamingContent]);
 
+    if (isLoading) return <div className="p-8 text-center">Loading conversation...</div>;
 
     return (
         <div className="flex h-[calc(100vh-80px)] gap-6">
-            {/* Chat Section */}
             <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.map((msg, idx) => {
+                    {allMessages.map((msg, idx) => {
                         const messageKey = `${msg.role}-${idx}`;
                         const isAssistant = msg.role === 'assistant';
 
@@ -266,13 +265,12 @@ const Workspace = () => {
                 </div>
             </div>
 
-            {/* Tool Execution Timeline Section */}
             <div className="w-80 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col hidden lg:flex">
                 <div className="p-4 border-b dark:border-gray-700">
                     <h3 className="font-semibold text-gray-900 dark:text-white">Tool Execution Timeline</h3>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {tools.map((tool, idx) => (
+                    {allTools.map((tool, idx) => (
                         <div key={idx} className="flex items-start gap-3">
                             <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                             <div>
@@ -281,7 +279,7 @@ const Workspace = () => {
                             </div>
                         </div>
                     ))}
-                    {tools.length === 0 && (
+                    {allTools.length === 0 && (
                         <p className="text-sm text-gray-500 text-center mt-10">No tools executed yet.</p>
                     )}
                 </div>

@@ -1,21 +1,23 @@
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../services/api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 const DashboardLayout = () => {
     const { user, logout } = useAuthStore();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
-    const handleLogout = async () => {
-        try {
+    const logoutMutation = useMutation({
+        mutationFn: async () => {
             await api.post('/auth/logout');
-        } catch (e) {
-            console.error('Logout error', e);
-        } finally {
+        },
+        onSettled: () => {
+            queryClient.clear();
             logout();
             navigate('/login');
         }
-    };
+    });
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
@@ -28,10 +30,11 @@ const DashboardLayout = () => {
                         <div className="flex items-center space-x-4">
                             <span className="text-gray-700 dark:text-gray-300">Welcome, {user?.name}</span>
                             <button
-                                onClick={handleLogout}
-                                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                onClick={() => logoutMutation.mutate()}
+                                disabled={logoutMutation.isPending}
+                                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
                             >
-                                Logout
+                                {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
                             </button>
                         </div>
                     </div>

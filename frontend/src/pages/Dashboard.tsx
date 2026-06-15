@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { PlusCircle, MessageSquare, Trash2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface Conversation {
     id: string;
@@ -10,56 +10,49 @@ interface Conversation {
 }
 
 const Dashboard = () => {
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
-    const fetchConversations = async () => {
-        try {
+    const { data: conversations = [], isLoading } = useQuery<Conversation[]>({
+        queryKey: ['conversations'],
+        queryFn: async () => {
             const { data } = await api.get('/conversations');
-            setConversations(data);
-        } catch (error) {
-            console.error('Failed to fetch conversations', error);
-        } finally {
-            setLoading(false);
+            return data;
         }
-    };
+    });
 
-    useEffect(() => {
-        fetchConversations();
-    }, []);
-
-    const createNewBlueprint = async () => {
-        try {
+    const createMutation = useMutation({
+        mutationFn: async () => {
             const { data } = await api.post('/conversations', { title: 'New Blueprint' });
+            return data;
+        },
+        onSuccess: (data) => {
             navigate(`/workspace/${data.id}`);
-        } catch (error) {
-            console.error('Failed to create new blueprint', error);
         }
-    };
+    });
 
-    const deleteConversation = async (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        try {
+    const deleteMutation = useMutation({
+        mutationFn: async (id: string) => {
             await api.delete(`/conversations/${id}`);
-            fetchConversations();
-        } catch (error) {
-            console.error('Failed to delete conversation', error);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
         }
-    };
+    });
 
-    if (loading) return <div className="p-8 text-center">Loading...</div>;
+    if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Blueprints</h2>
                 <button
-                    onClick={createNewBlueprint}
-                    className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
+                    onClick={() => createMutation.mutate()}
+                    disabled={createMutation.isPending}
+                    className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors disabled:opacity-50"
                 >
                     <PlusCircle className="w-5 h-5" />
-                    <span>New Blueprint</span>
+                    <span>{createMutation.isPending ? 'Creating...' : 'New Blueprint'}</span>
                 </button>
             </div>
 
@@ -88,8 +81,12 @@ const Dashboard = () => {
                                     </div>
                                 </div>
                                 <button
-                                    onClick={(e) => deleteConversation(conv.id, e)}
-                                    className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteMutation.mutate(conv.id);
+                                    }}
+                                    disabled={deleteMutation.isPending}
+                                    className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
                                 >
                                     <Trash2 className="w-5 h-5" />
                                 </button>
