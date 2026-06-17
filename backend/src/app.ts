@@ -36,18 +36,11 @@ import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import conversationRoutes from './modules/conversations/conversations.routes.js';
 import aiRoutes from './modules/ai/ai.routes.js';
-import swaggerUi from 'swagger-ui-express';
-import { readFileSync } from 'fs';
-
-const swaggerDocument = JSON.parse(readFileSync(new URL('./swagger.json', import.meta.url), 'utf-8')) as any;
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/conversations', conversationRoutes);
 app.use('/api/v1/ai', aiRoutes);
-
-// Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Global Error Handler
 app.use(errorHandler);
